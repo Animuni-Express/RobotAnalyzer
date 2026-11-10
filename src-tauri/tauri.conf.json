@@ -19,6 +19,6 @@
     "active": true,
     "targets": ["nsis"],
     "icon": ["icons/icon.ico"],
-    "windows": { "webviewInstallMode": { "type": "skip" } }
+    "windows": { "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true } }
   }
 }

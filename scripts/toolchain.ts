@@ -20,7 +20,7 @@ if (!command) {
 }
 
 const args = [...command, ...extra];
-if (process.platform === 'win32') applyQuietJob();
+if (process.platform === 'win32' && process.env.GITHUB_ACTIONS !== 'true' && (mode?.startsWith('desktop-') || process.env.ROBOT_ANALYZER_IN_QUIET_JOB === '1')) applyQuietJob();
 const env = { ...process.env, CARGO_BUILD_JOBS: '1', RAYON_NUM_THREADS: '1', GOMAXPROCS: '1' };
 const result = spawnSync({
   cmd: [process.execPath, ...args],

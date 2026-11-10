@@ -36,6 +36,7 @@ export function EngineeringPlot({ series, xLabel, yLabel, onExport }: {
     return { xMin: x.min, xMax: x.max, yMin: y.min, yMax: y.max };
   }, [series]);
   const [view, setView] = useState<Bounds | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [cursor, setCursor] = useState<readonly [number, number] | null>(null);
   const range = view ?? bounds;
   const x = (value: number) => margin.left + (value - range.xMin) / (range.xMax - range.xMin) * plotWidth;
@@ -63,8 +64,8 @@ export function EngineeringPlot({ series, xLabel, yLabel, onExport }: {
         {series.map((item, index) => <span key={item.name} style={{ marginLeft: 12, whiteSpace: 'nowrap' }}><i style={{ display: 'inline-block', width: 10, height: 3, background: colors[index % colors.length], marginRight: 5, verticalAlign: 'middle' }} />{item.name}</span>)}
       </span>
     </div>
-    <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${yLabel} versus ${xLabel}`} style={{ display: 'block', width: '100%', height: 'auto', touchAction: 'none', cursor: dragRef.current ? 'grabbing' : 'crosshair' }}
-      onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { ...pointerPosition(event), bounds: range }; }}
+    <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${yLabel} versus ${xLabel}`} style={{ display: 'block', width: '100%', height: 'auto', touchAction: 'none', cursor: dragging ? 'grabbing' : 'crosshair' }}
+      onPointerDown={event => { if (event.button !== 0) return; setDragging(true); event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { ...pointerPosition(event), bounds: range }; }}
       onPointerMove={event => {
         const pos = pointerPosition(event);
         setCursor([range.xMin + (pos.x - margin.left) / plotWidth * (range.xMax - range.xMin), range.yMax - (pos.y - margin.top) / plotHeight * (range.yMax - range.yMin)]);
@@ -75,7 +76,7 @@ export function EngineeringPlot({ series, xLabel, yLabel, onExport }: {
           setView({ xMin: drag.bounds.xMin - dx, xMax: drag.bounds.xMax - dx, yMin: drag.bounds.yMin + dy, yMax: drag.bounds.yMax + dy });
         }
       }}
-      onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} onPointerLeave={() => setCursor(null)}
+      onPointerUp={() => { dragRef.current = null; setDragging(false); }} onPointerCancel={() => { dragRef.current = null; setDragging(false); }} onPointerLeave={() => setCursor(null)}
       onWheel={event => { event.preventDefault(); zoom(event.deltaY < 0 ? 0.9 : 1.1); }}>
       {ticks.map((t, index) => {
         const gx = margin.left + t * plotWidth; const gy = margin.top + t * plotHeight;
@@ -87,7 +88,8 @@ export function EngineeringPlot({ series, xLabel, yLabel, onExport }: {
         </g>;
       })}
       <path d={`M${margin.left} ${margin.top}V${margin.top + plotHeight}H${margin.left + plotWidth}`} fill="none" stroke="#94a3b8" />
-      {series.map((item, index) => <polyline key={item.name} points={item.points.filter(([px, py]) => Number.isFinite(px) && Number.isFinite(py)).map(([px, py]) => `${x(px)},${y(py)}`).join(' ')} fill="none" stroke={colors[index % colors.length]} strokeWidth="2" strokeLinejoin="round" />)}
+      <defs><clipPath id="plot-area"><rect x={margin.left} y={margin.top} width={plotWidth} height={plotHeight} /></clipPath></defs>
+      {series.map((item, index) => <polyline clipPath="url(#plot-area)" key={item.name} points={item.points.filter(([px, py]) => Number.isFinite(px) && Number.isFinite(py)).map(([px, py]) => `${x(px)},${y(py)}`).join(' ')} fill="none" stroke={colors[index % colors.length]} strokeWidth="2" strokeLinejoin="round" />)}
       <text x={margin.left + plotWidth / 2} y={height - 10} textAnchor="middle" fill="#cbd5e1">{xLabel}</text>
       <text transform={`translate(18 ${margin.top + plotHeight / 2}) rotate(-90)`} textAnchor="middle" fill="#cbd5e1">{yLabel}</text>
     </svg>

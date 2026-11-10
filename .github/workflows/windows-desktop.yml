@@ -1,6 +1,9 @@
 name: Windows desktop build
 
 on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'src-tauri/**', 'scripts/**', 'package.json', 'bun.lock', '.github/workflows/windows-desktop.yml']
   workflow_dispatch:
 
 permissions:
@@ -17,7 +20,7 @@ jobs:
           bun-version: 1.4.4
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile --network-concurrency 1
-      - name: Build capped Tauri installer
+      - name: Build Tauri installer on remote runner
         run: bun run desktop:build
       - uses: actions/upload-artifact@v4
         with:

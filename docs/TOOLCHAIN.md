@@ -17,18 +17,12 @@ Vite 8 uses Rolldown for dependency optimization and production bundling. Oxc st
 
 On Windows the script wrapper starts each tool below normal process priority. Cargo builds one crate at a time and the wrapper sets `RAYON_NUM_THREADS=1`. The development server watches frontend files only. Production source maps and automatic gzip size reports are disabled to avoid extra build work. The packaged desktop application serves the bundled assets directly. [Windows scheduling priorities](https://learn.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities)
 
-## Verification and measurements
+## Build resource policy
 
-The Windows launcher configures a job-wide hard cap of 10% CPU and 1 GB of committed memory before starting Bun. Nested tool invocations share the same budget. If Windows rejects the limits or refuses to attach the launcher to the job, the command stops before starting the tool. If a compiler exceeds the memory budget, its allocation can fail. [CPU rate limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information) · [Job memory limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information)
+Local Windows desktop commands configure a job-wide hard cap of 10% CPU and 1 GB committed memory before starting their child tools. Nested frontend checks share that budget. Standalone web commands do not apply the cap. GitHub Actions builds run remotely without the local job cap; Cargo still compiles one crate at a time. The first Windows run failed compiling `tauri-utils` because the 1 GB job budget was exhausted. The remote exemption lets hosted runners use their allocated memory without consuming resources on the user's PC.
 
-The new development dependencies still need installation and a lockfile refresh. The application and toolchain are under construction. Verification and benchmarks were paused after reports of foreground stuttering.
+## Verification
 
-| Metric | Result |
-| --- | --- |
-| Cold and warm type-check wall time | Pending |
-| Development startup to first served page | Pending |
-| Checked production build wall time | Pending |
-| Raw bundle size and largest chunks | Pending |
-| Peak build process memory | Pending |
+Cloud Linux verification uses Bun 1.4.4. `bun run build` runs type checking, Oxlint, all robotics tests, and the Vite production bundle. `bun run typecheck:tsc` independently checks compatibility with the official TypeScript compiler. Browser QA uses the shared cloud Chromium. The current cloud browser cannot create a WebGL context, so compatibility projection, navigation, controls and plots can be tested there; hardware 3D performance requires a WebGL-capable machine.
 
-The prior workspace contained a Bun starter without a comparable frontend production pipeline. Record the tool versions, Windows power mode, and exact command with each measurement. Measure once with caches cold and again with the same project and caches warm. Keep the results separate from the app's render performance.
+Windows packaging runs through `.github/workflows/windows-desktop.yml` on pushes to `main` that affect application or build files, or on manual dispatch. Successful runs upload the executable and NSIS installer as `robot-analyzer-windows`. The installer downloads the official WebView2 bootstrapper if the Windows machine needs WebView2.

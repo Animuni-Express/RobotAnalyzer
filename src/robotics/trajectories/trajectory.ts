@@ -12,6 +12,7 @@ export interface TrajectorySpec {
   finalVelocity?: readonly number[];
   initialAcceleration?: readonly number[];
   finalAcceleration?: readonly number[];
+  limits?: readonly { min: number; max: number }[];
 }
 
 export interface MotionSample {
@@ -36,10 +37,34 @@ function derivative(coefficients: number[], duration: number): number[] {
   return coefficients.slice(1).map((coefficient, index) => (index + 1) * (coefficient / duration));
 }
 
+// Isolate stationary points recursively so boundary velocities cannot hide limit overshoot.
+function rootsOnUnitInterval(coefficients: readonly number[]): number[] {
+  const c = [...coefficients];
+  while (c.length > 1 && c.at(-1) === 0) c.pop();
+  if (c.length < 2) return [];
+  if (c.length === 2) { const root = -c[0]! / c[1]!; return root > 0 && root < 1 ? [root] : []; }
+  const partition = [0, ...rootsOnUnitInterval(c.slice(1).map((v, i) => v * (i + 1))), 1];
+  const roots: number[] = [];
+  for (let i = 0; i < partition.length - 1; i++) {
+    let lo = partition[i]!, hi = partition[i + 1]!;
+    let left = polynomialAt(c, lo), right = polynomialAt(c, hi);
+    if (left === 0) roots.push(lo);
+    if (right === 0) roots.push(hi);
+    if (Math.sign(left) === Math.sign(right) || left === 0 || right === 0) continue;
+    for (let step = 0; step < 60; step++) {
+      const mid = (lo + hi) / 2, value = polynomialAt(c, mid);
+      if (value === 0) { lo = hi = mid; break; }
+      if (Math.sign(value) === Math.sign(left)) { lo = mid; left = value; } else { hi = mid; right = value; }
+    }
+    roots.push((lo + hi) / 2);
+  }
+  return [...new Set(roots)].filter(v => v > 0 && v < 1).sort((a,b) => a-b);
+}
+
 export function createTrajectory(spec: TrajectorySpec): Result<Trajectory> {
   const { kind, startTime, endTime, initial, final, initialVelocity, finalVelocity, initialAcceleration, finalAcceleration } = spec;
   const duration = endTime - startTime;
-  if (!Number.isFinite(duration) || duration <= 0) {
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || !Number.isFinite(duration) || duration <= 0) {
     return failure('Final time must be finite and greater than initial time.');
   }
   if (!['linear', 'cubic', 'quintic', 'cycloidal'].includes(kind)) {
@@ -88,6 +113,19 @@ export function createTrajectory(spec: TrajectorySpec): Result<Trajectory> {
     return failure('Trajectory derivatives exceed the supported numeric range.');
   }
 
+  if (spec.limits) {
+    if (spec.limits.length !== jointCount || spec.limits.some(l => !Number.isFinite(l.min) || !Number.isFinite(l.max) || l.min > l.max)) {
+      return failure('Trajectory limits must contain one finite, ordered range per joint.');
+    }
+    for (let i = 0; i < jointCount; i++) {
+      const limit = spec.limits[i]!;
+      const times = cycloidal ? [0, 1] : [0, ...rootsOnUnitInterval(coefficients[i]!.slice(1).map((v,k) => v * (k + 1))), 1];
+      if (times.some(t => { const value = polynomialAt(coefficients[i]!, t); return value < limit.min - 1e-10 || value > limit.max + 1e-10; })) {
+        return failure(`Joint ${i + 1} trajectory exceeds its position limits. Reduce boundary velocities or accelerations, or change the endpoints.`);
+      }
+    }
+  }
+
   return success({
     startTime, endTime, jointCount,
     sample(requestedTime) {
@@ -114,4 +152,27 @@ export function createTrajectory(spec: TrajectorySpec): Result<Trajectory> {
       };
     },
   });
+}
+
+/** Interpolate validated dynamics samples for playback without rerunning the solver. */
+export function sampledTrajectory(samples: readonly MotionSample[]): Trajectory {
+  if (samples.length < 2) throw new RangeError('At least two motion samples are required.');
+  const count = samples[0]!.position.length;
+  if (!count || samples.some((sample, i) => !Number.isFinite(sample.time) ||
+    (i > 0 && sample.time <= samples[i - 1]!.time) ||
+    [sample.position, sample.velocity, sample.acceleration].some(v => v.length !== count || v.some(n => !Number.isFinite(n))))) {
+    throw new RangeError('Motion samples must have increasing finite times and one finite state per joint.');
+  }
+  const startTime = samples[0]!.time;
+  const endTime = samples.at(-1)!.time;
+  return { startTime, endTime, jointCount: count, sample(requestedTime) {
+    if (!Number.isFinite(requestedTime)) throw new RangeError('Sample time must be finite.');
+    const time = Math.max(startTime, Math.min(endTime, requestedTime));
+    let lo = 0, hi = samples.length - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >>> 1; if (samples[mid]!.time <= time) lo = mid; else hi = mid; }
+    const a = samples[lo]!, b = samples[hi]!;
+    const fraction = (time - a.time) / (b.time - a.time);
+    const interpolate = (key: 'position' | 'velocity' | 'acceleration') => a[key].map((v, i) => v + fraction * (b[key][i]! - v));
+    return { time, position: interpolate('position'), velocity: interpolate('velocity'), acceleration: interpolate('acceleration') };
+  } };
 }
