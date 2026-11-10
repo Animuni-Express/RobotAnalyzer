@@ -6,12 +6,15 @@ import { computeFrames, geometricJacobian, solveIK } from '../robotics/kinematic
 import { builtInRobots, createJoint, maxJoints, validateRobot } from '../robotics/models';
 import type { Joint, Robot, Vec3 } from '../robotics/models';
 import { createTrajectory } from '../robotics/trajectories/trajectory';
+import type { Trajectory } from '../robotics/trajectories/trajectory';
 import { positionOf, orientationOf, rpyFromRotation } from '../robotics/transforms';
 import { createMotion, csv, readBrowserProject, readProject, trajectoryKinds, writeFile } from '../state/projects';
 import type { Project } from '../state/projects';
 
 const EngineeringPlot = lazy(() => import('../graphs/EngineeringPlot').then(module => ({ default: module.EngineeringPlot })));
-const tabs = ['Robot', 'DH', 'FKin', 'IKin', 'Trajectory', 'Graphs', 'Settings'] as const;
+const DynamicsPanel = lazy(() => import('../components/DynamicsPanel').then(module => ({ default: module.DynamicsPanel })));
+const VirtualRobotPanel = lazy(() => import('../components/VirtualRobotPanel').then(module => ({ default: module.VirtualRobotPanel })));
+const tabs = ['Robot', 'DH', 'FKin', 'IKin', 'Dynamics', 'Trajectory', 'Graphs', 'Virtual Robot', 'Settings'] as const;
 const views: CameraView[] = ['perspective', 'front', 'back', 'left', 'right', 'top', 'bottom', 'isometric'];
 const firstRobot = builtInRobots.find(robot => robot.joints.length === 2) ?? builtInRobots[0]!;
 const axes = ['X', 'Y', 'Z'] as const;
@@ -37,6 +40,7 @@ export function Workspace() {
   const [tracePoints, setTracePoints] = useState(121);
   const [plotValue, setPlotValue] = useState<'position' | 'velocity' | 'acceleration'>('position');
   const [pose, setPose] = useState<number[]>();
+  const [cartesian, setCartesian] = useState<Trajectory>();
   const clock = useRef(0);
   const file = useRef<HTMLInputElement>(null);
   const view = useRef<ViewportHandle>(null);
@@ -53,6 +57,9 @@ export function Workspace() {
     initialAcceleration: motion.kind === 'quintic' ? motion.initialAcceleration : undefined,
     finalAcceleration: motion.kind === 'quintic' ? motion.finalAcceleration : undefined,
   }), [robot, motion]);
+  const playback = cartesian ?? (trajectory.success ? trajectory.data : undefined);
+  const playbackStart = playback?.startTime ?? motion.startTime;
+  const playbackEnd = playback?.endTime ?? motion.endTime;
   const plotSamples = useMemo(() => tab === 'Graphs' && trajectory.success
     ? Array.from({ length: 161 }, (_, i) => trajectory.data.sample(motion.startTime + (motion.endTime - motion.startTime) * i / 160))
     : [], [tab, trajectory, motion.startTime, motion.endTime]);
@@ -62,16 +69,16 @@ export function Workspace() {
   }) : undefined, [showTrace, trajectory, tracePoints, motion.startTime, motion.endTime, robot]);
 
   useEffect(() => {
-    if (!playing || !trajectory.success) return;
+    if (!playing || !playback) return;
     let last = performance.now();
     let displayed = last;
     let frame = 0;
     const step = (now: number) => {
       clock.current += Math.min(now - last, 100) * speed / 1000;
       last = now;
-      const finished = clock.current >= motion.endTime;
-      if (finished) clock.current = loop ? motion.startTime : motion.endTime;
-      const next = trajectory.data.sample(clock.current).position;
+      const finished = clock.current >= playbackEnd;
+      if (finished) clock.current = loop ? playbackStart : playbackEnd;
+      const next = playback.sample(clock.current).position;
       view.current?.setFrames(computeFrames(robot, next).frames);
       if (finished || now - displayed >= 100) {
         displayed = now;
@@ -83,10 +90,11 @@ export function Workspace() {
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [playing, trajectory, robot, speed, loop, motion.startTime, motion.endTime]);
+  }, [playing, playback, robot, speed, loop, playbackStart, playbackEnd]);
 
   function stop() {
     setPlaying(false);
+    setCartesian(undefined);
     setPose(undefined);
     clock.current = motion.startTime;
     setTime(motion.startTime);
@@ -136,8 +144,8 @@ export function Workspace() {
 
   const saveFile = () => exportFile('project.robot.json', 'json', JSON.stringify(project, null, 2));
   function togglePlay() {
-    if (!trajectory.success) { setMessage(trajectory.errors.join(' ')); return; }
-    if (clock.current >= motion.endTime || clock.current < motion.startTime) clock.current = motion.startTime;
+    if (!playback) { setMessage(trajectory.errors.join(' ')); return; }
+    if (clock.current >= playbackEnd || clock.current < playbackStart) clock.current = playbackStart;
     setPlaying(!playing);
   }
 
@@ -201,12 +209,12 @@ export function Workspace() {
           jointTypes={jointTypes} dh={tab === 'DH' ? { joint: selected, angle: joint.theta + (joint.type === 'revolute' ? q[selected]! : 0),
             offset: joint.d + (joint.type === 'prismatic' ? q[selected]! : 0), length: joint.a, twist: joint.alpha, progress: dhProgress, allFrames } : undefined} />
         <div className="actions playback"><button onClick={togglePlay}>{playing ? 'Pause' : 'Play'}</button><button onClick={stop}>Stop</button>
-          <input aria-label="Simulation time" type="range" min={motion.startTime} max={motion.endTime} step="any" value={time} onChange={event => {
-            if (!trajectory.success) return;
+          <input aria-label="Simulation time" type="range" min={playbackStart} max={playbackEnd} step="any" value={time} onChange={event => {
+            if (!playback) return;
             setPlaying(false);
             clock.current = Number(event.target.value);
             setTime(clock.current);
-            setPose(trajectory.data.sample(clock.current).position);
+            setPose(playback.sample(clock.current).position);
           }} /><output>{format(time, 2)} s</output></div>
       </section>
       <aside className="panel results" aria-label="Analysis results">
@@ -247,6 +255,17 @@ export function Workspace() {
           <p><label><input type="checkbox" checked={loop} onChange={event => setLoop(event.target.checked)} /> Loop</label></p>
           <p><label><input type="checkbox" checked={showTrace} onChange={event => setShowTrace(event.target.checked)} /> Show end-effector trace</label></p>
         </>}
+        {tab === 'Dynamics' && <Suspense fallback={<p>Loading dynamics…</p>}><DynamicsPanel robot={robot} q={configuration}
+          onRobotChange={next => { stop(); setProject({ ...project, robot: next }); }}
+          onExportCsv={(name, content) => { void exportFile(name, 'csv', content); }} /></Suspense>}
+        {tab === 'Virtual Robot' && <Suspense fallback={<p>Loading virtual robot…</p>}><VirtualRobotPanel robot={robot}
+          configuration={configuration} onConfigurationChange={setConfiguration} onTrajectory={next => {
+            setCartesian(next);
+            clock.current = next.startTime;
+            setTime(next.startTime);
+            setPose(next.sample(next.startTime).position);
+            setPlaying(true);
+          }} /></Suspense>}
         {tab === 'Settings' && <>
           <NumberField label="Matrix decimals" value={precision} min={0} max={10} integer onChange={setPrecision} />
           <label className="field">Graphics profile<select value={viewport.profile} onChange={event => {

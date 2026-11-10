@@ -1,0 +1,28 @@
+name: Windows desktop build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile --network-concurrency 1
+      - name: Build capped Tauri installer
+        run: bun run desktop:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: robot-analyzer-windows
+          path: |
+            src-tauri/target/release/robot-analyzer.exe
+            src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
