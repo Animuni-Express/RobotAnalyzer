@@ -22,6 +22,17 @@ jobs:
         run: bun install --frozen-lockfile --network-concurrency 1
       - name: Build Tauri installer on remote runner
         run: bun run desktop:build
+      - name: Smoke test desktop startup
+        shell: pwsh
+        run: |
+          $app = Start-Process -FilePath (Resolve-Path src-tauri/target/release/robot-analyzer.exe) -PassThru
+          try {
+            Start-Sleep -Seconds 8
+            if ($app.HasExited) { throw "Robot Analyzer exited during startup (code $($app.ExitCode))." }
+            Write-Output "Desktop process stayed running for the startup smoke test."
+          } finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: robot-analyzer-windows
