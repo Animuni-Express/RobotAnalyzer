@@ -1,0 +1,9 @@
+{
+  "plugins": ["react", "typescript"],
+  "ignorePatterns": ["dist/**", "src-tauri/**"],
+  "rules": {
+    "no-unused-vars": "error",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error"
+  }
+}

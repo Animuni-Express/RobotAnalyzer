@@ -1,0 +1,37 @@
+{
+  "name": "robotanalyzer",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run scripts/toolchain.ts dev",
+    "typecheck": "bun run scripts/toolchain.ts typecheck",
+    "typecheck:tsc": "bun run scripts/toolchain.ts tsc",
+    "lint": "bun run scripts/toolchain.ts lint",
+    "test": "bun run scripts/toolchain.ts test",
+    "check": "bun run typecheck && bun run lint && bun run test",
+    "build": "bun run check && bun run scripts/toolchain.ts bundle",
+    "desktop:dev": "bun run scripts/toolchain.ts desktop-dev",
+    "desktop:build": "bun run typecheck:tsc && bun run scripts/toolchain.ts desktop-build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-fs": "^2",
+    "react": "^19",
+    "react-dom": "^19",
+    "three": "^0.183.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/bun": "latest",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.183.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "oxlint": "^1.89.0",
+    "tsrs": "0.23.0-ts7.1.0-beta",
+    "typescript": "^7",
+    "vite": "^8"
+  }
+}

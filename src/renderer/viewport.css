@@ -1,0 +1,51 @@
+.robot-viewport {
+  position: relative;
+  inline-size: 100%;
+  block-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: hidden;
+  background: #10151e;
+}
+
+.robot-viewport canvas {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  touch-action: none;
+}
+
+.robot-viewport canvas:focus-visible { outline: 2px solid #83cbff; outline-offset: -2px; }
+
+.robot-viewport-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.robot-viewport-labels span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font: 600 11px ui-monospace, monospace;
+  text-shadow: 0 1px 3px #000, 0 1px 3px #000;
+}
+
+.robot-viewport-diagnostics {
+  position: absolute;
+  bottom: .5rem;
+  right: .5rem;
+  pointer-events: none;
+  padding: .4rem .5rem;
+  background: #10151eeb;
+  color: #e1ebff;
+  font: 11px ui-monospace, monospace;
+  white-space: pre-line;
+}
+
+.robot-viewport-error {
+  position: absolute;
+  inset: 1rem auto auto 1rem;
+  margin: 0;
+  color: #ffd8cb;
+}
