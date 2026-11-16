@@ -22,7 +22,10 @@ if (!command) {
 }
 
 const args = [...command, ...extra];
-if (process.platform === 'win32') applyQuietJob(mode === 'desktop-build' ? 4_000_000_000n : 1_000_000_000n);
+if (process.platform === 'win32' && process.env.GITHUB_ACTIONS !== 'true' &&
+    (mode?.startsWith('desktop-') || mode?.startsWith('tinyjs-') || process.env.ROBOT_ANALYZER_IN_QUIET_JOB === '1')) {
+  applyQuietJob(mode?.startsWith('desktop-') ? 4_000_000_000n : 1_000_000_000n);
+}
 const env = { ...process.env, CARGO_BUILD_JOBS: '1', RAYON_NUM_THREADS: '1', GOMAXPROCS: '1',
   ...(process.platform === 'win32' ? { OS: 'Windows_NT' } : {}),
 };

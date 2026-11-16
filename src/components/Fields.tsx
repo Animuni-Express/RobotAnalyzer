@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Mat4 } from '../robotics/math';
 
 export const format = (value: number, decimals = 4) => Number(value.toFixed(decimals)).toString();
@@ -9,7 +9,10 @@ export function NumberField({ label, value, onChange, min = -Infinity, max = Inf
 }) {
   const [draft, setDraft] = useState(() => format(value, decimals));
   const [error, setError] = useState('');
-  useEffect(() => { setDraft(format(value, decimals)); setError(''); }, [value, decimals]);
+  const [previous, setPrevious] = useState({ value, decimals });
+  if (previous.value !== value || previous.decimals !== decimals) {
+    setPrevious({ value, decimals }); setDraft(format(value, decimals)); setError('');
+  }
   return <label className="field"><span>{label}</span><input type="text" inputMode="decimal" value={draft}
     aria-invalid={Boolean(error)} title={error || label}
     onChange={event => { setDraft(event.target.value); setError(''); }}
@@ -23,7 +26,7 @@ export function NumberField({ label, value, onChange, min = -Infinity, max = Inf
         return;
       }
       onChange(next);
-      setDraft(format(next, decimals));
+      setDraft(format(value, decimals));
     }}
     onKeyDown={event => {
       if (event.key === 'Enter') event.currentTarget.blur();

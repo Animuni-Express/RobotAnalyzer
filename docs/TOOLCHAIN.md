@@ -14,21 +14,19 @@ Vite 8 uses Rolldown for dependency optimization and production bundling. Oxc st
 | `bun run check` | Runs the type check, lint, and tests in sequence. |
 | `bun run build` | Runs `check`, then emits the minified frontend to `dist`. |
 | `bun run desktop:build` | Runs the compatibility check, then Tauri bundles the checked frontend with the native application. |
+| `bun run tinyjs:dev` | Starts the TinyJS desktop window with Vite hot reload. |
+| `bun run tinyjs:build` | Runs the compatibility check and checked frontend build, then packages the TinyJS portable app. |
 
 On Windows the script wrapper starts each tool below normal process priority. Cargo builds one crate at a time and the wrapper sets `RAYON_NUM_THREADS=1`. The development server watches frontend files only. Production source maps and automatic gzip size reports are disabled to avoid extra build work. The packaged desktop application serves the bundled assets directly. [Windows scheduling priorities](https://learn.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities)
 
-## Verification and measurements
+## Build resource policy
 
-The Windows launcher configures a job-wide hard cap of 10% CPU and 1 GB of committed memory before starting Bun. Tauri desktop builds use 4 GB because the Rust Windows bindings exceed 2 GB during compilation. TinyJS builds and frontend tools retain the 1 GB budget. Nested tool invocations share the same budget. If Windows rejects the limits or refuses to attach the launcher to the job, the command stops before starting the tool. [CPU rate limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information) · [Job memory limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information)
+Local Windows desktop commands configure a job-wide hard cap of 10% CPU before starting their child tools. Tauri commands use 4 GB committed memory because `tauri-utils` exhausted 1 GB and the Rust Windows bindings exhausted 2 GB. TinyJS commands use 1 GB. Nested frontend checks share the desktop command's budget. Standalone web commands do not apply the cap. GitHub Actions builds run remotely without the local job cap; Cargo still compiles one crate at a time. [CPU rate limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information) · [Job memory limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information)
 
-On 2026-11-16, `bun run tinyjs:build` passed on Windows x64 with Bun 1.4.4 and TinyJS 0.74.0: both TypeScript checkers, lint (with existing warnings), all 18 tests, the Vite production build and TinyJS executable packaging completed. A separate check against the actual txiki.js runtime passed for file reads, atomic replacement, cancellation, import size limits and window minimum sizing. Native GUI verification was unavailable because computer-use app approval timed out. Performance measurements below remain pending.
+## Verification
 
-| Metric | Result |
-| --- | --- |
-| Cold and warm type-check wall time | Pending |
-| Development startup to first served page | Pending |
-| Checked production build wall time | Pending |
-| Raw bundle size and largest chunks | Pending |
-| Peak build process memory | Pending |
+Cloud Linux verification uses Bun 1.4.4. `bun run build` runs type checking, Oxlint, all robotics tests, and the Vite production bundle. `bun run typecheck:tsc` independently checks compatibility with the official TypeScript compiler. Browser QA uses the shared cloud Chromium. The current cloud browser cannot create a WebGL context, so compatibility projection, navigation, controls and plots can be tested there; hardware 3D performance requires a WebGL-capable machine.
 
-The prior workspace contained a Bun starter without a comparable frontend production pipeline. Record the tool versions, Windows power mode, and exact command with each measurement. Measure once with caches cold and again with the same project and caches warm. Keep the results separate from the app's render performance.
+Windows packaging runs through `.github/workflows/windows-desktop.yml` on pushes to `main` that affect application or build files, or on manual dispatch. Tauri uploads its executable and NSIS installer as `robot-analyzer-windows`; TinyJS uploads its portable ZIP as `robot-analyzer-tinyjs-windows`. The Tauri installer downloads the official WebView2 bootstrapper when needed. TinyJS requires WebView2 already installed.
+
+Local Windows x64 verification uses Bun 1.4.4 and TinyJS 0.74.0. A separate check against the actual txiki.js runtime passed for file reads, replacement, cancellation, import size limits and window minimum sizing. Full native GUI interaction and hardware 3D performance have not been verified.

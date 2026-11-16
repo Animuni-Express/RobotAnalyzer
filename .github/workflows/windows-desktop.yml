@@ -1,6 +1,9 @@
 name: Windows desktop build
 
 on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'src-tauri/**', 'backend/**', 'tests/**', 'scripts/**', 'package.json', 'bun.lock', 'tinyjs.json', 'vite.config.ts', '.github/workflows/windows-desktop.yml']
   workflow_dispatch:
 
 permissions:
@@ -17,12 +20,64 @@ jobs:
           bun-version: 1.4.4
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile --network-concurrency 1
-      - name: Build capped Tauri installer
+      - name: Build Tauri installer on remote runner
         run: bun run desktop:build
+      - name: Smoke test desktop startup
+        shell: pwsh
+        run: |
+          $app = Start-Process -FilePath (Resolve-Path src-tauri/target/release/robot-analyzer.exe) -WindowStyle Hidden -PassThru
+          try {
+            Start-Sleep -Seconds 8
+            if ($app.HasExited) { throw "Robot Analyzer exited during startup (code $($app.ExitCode))." }
+            Write-Output "Desktop process stayed running for the startup smoke test."
+          } finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: robot-analyzer-windows
           path: |
             src-tauri/target/release/robot-analyzer.exe
             src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+  tinyjs:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile --network-concurrency 1
+      - name: Install TinyJS 0.74.0
+        shell: pwsh
+        env:
+          TINYJS_VERSION: v0.74.0
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'tinyjs-install.ps1'
+          Invoke-WebRequest https://tinyjs.app/install.ps1 -OutFile $installer
+          & $installer
+          (Join-Path $env:LOCALAPPDATA 'tinyjs') | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Build TinyJS portable application
+        run: bun run tinyjs:build
+      - name: Smoke test TinyJS startup
+        shell: pwsh
+        run: |
+          $app = Start-Process -FilePath (Resolve-Path dist/robot-analyzer.exe) -WindowStyle Hidden -PassThru
+          try {
+            Start-Sleep -Seconds 8
+            if ($app.HasExited) { throw "TinyJS Robot Analyzer exited during startup (code $($app.ExitCode))." }
+            Write-Output "TinyJS process stayed running for the startup smoke test."
+          } finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id }
+          }
+      - name: Package both TinyJS executables
+        shell: pwsh
+        run: Compress-Archive -LiteralPath dist/robot-analyzer.exe,dist/launcher.exe -DestinationPath RobotAnalyzer-TinyJS-0.1.0-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: robot-analyzer-tinyjs-windows
+          path: RobotAnalyzer-TinyJS-0.1.0-windows-x64.zip
           if-no-files-found: error

@@ -1,31 +1,38 @@
-# Robot Analyzer — TinyJS experiment
+# Robot Analyzer
 
-This separate checkout runs the existing React workspace, Three.js viewport and robotics calculations in TinyJS. Native dialogs open project JSON and save JSON/CSV exports. Project format version 1 and its 1 MiB import limit are unchanged; saves use a temporary file before replacing the destination.
+A clean-room robotics workstation with one React/TypeScript frontend for the hosted website and two Windows desktop versions: Rust/Tauri and JavaScript/TinyJS. Both desktop versions use the same robotics calculations and project format.
 
-On Windows, install [TinyJS](https://tinyjs.app/docs/install) and reopen your terminal:
+```sh
+bun install --frozen-lockfile
+bun run dev
+bun run build
+```
+
+Open the development URL printed by Vite (port 1420). Choose an example robot, edit standard DH parameters, then select DH, FKin, IKin, Dynamics, Trajectory, Graphs or Virtual Robot. Lengths use meters and angles use radians. Projects save as `.robot.json`; numerical data exports as CSV.
+
+The solver supports mixed revolute/prismatic chains, numerical pose IK, Newton–Euler dynamics, RK4 forward simulation and linear/cubic/quintic/cycloidal joint motion. It rejects polynomial paths that exceed joint limits, including interior overshoot from nonzero boundary conditions. Cartesian planning validates the path segment by segment; orientation hold is optional.
+
+The 3D view renders on demand. A CPU projection is available when WebGL cannot initialize. Projection offers fixed camera views and joint selection; orbit, pan, DH animation and target dragging use the WebGL renderer.
+
+## Desktop versions
+
+Both versions require Windows x64 and WebView2. The Tauri installer installs WebView2 when needed; TinyJS portable users need the runtime already installed.
+
+| Version | Develop | Build | Windows output |
+| --- | --- | --- | --- |
+| Tauri (Rust toolchain required) | `bun run desktop:dev` | `bun run desktop:build` | `src-tauri/target/release/bundle/nsis/Robot Analyzer_0.1.0_x64-setup.exe` |
+| TinyJS 0.74.0 | `bun run tinyjs:dev` | `bun run tinyjs:build` | `dist/robot-analyzer.exe` and `dist/launcher.exe` together |
+
+Install [TinyJS](https://tinyjs.app/docs/install) on Windows, then reopen the terminal:
 
 ```powershell
 irm https://tinyjs.app/install.ps1 | iex
 ```
 
-With Bun installed, run these commands from this checkout:
+TinyJS packaging replaces `dist/` with the portable application. Build Tauri before TinyJS when building both. Published release downloads label each runtime; extract the TinyJS ZIP before running `robot-analyzer.exe` and keep its files together. Builds are unsigned.
 
-```powershell
-bun install --frozen-lockfile
-bun run tinyjs:dev
-```
+Native dialogs open project JSON and save JSON/CSV exports. Version 1 projects and the 1 MiB import limit work across both versions. TinyJS saves replace files only after writing a temporary file; its page can call only the two file operations, and the backend owns file picking.
 
-Build the portable app:
+`bun run check` runs type checking, lint and tests; `bun run typecheck:tsc` independently checks the official TypeScript compiler. The tests cover robotics behavior and desktop file round trips, cancellation, invalid input and failed saves. macOS and Linux desktop builds have not been tested.
 
-```powershell
-bun run tinyjs:build
-.\dist\robot-analyzer.exe
-```
-
-Distribute both `dist/robot-analyzer.exe` and `dist/launcher.exe` together. Windows requires WebView2. The build uses relative asset paths so the packaged UI works without a development server. TinyJS owns `dist/` after packaging; use `bun run dev` for frontend development.
-
-`bun run check` runs the type checker, lint and Bun tests. `bun run typecheck:tsc` also checks compatibility with the official TypeScript compiler. Desktop file tests cover format compatibility, CSV exports, cancellation, invalid/oversized input, and preservation of existing files when replacement fails.
-
-The original Tauri files and `desktop:dev` / `desktop:build` commands remain available for comparison. The TinyJS configuration uses a separate application ID and exposes only the two file operations to the page. Native pickers run in the backend, so the page cannot request arbitrary filesystem paths.
-
-Validated with TinyJS 0.74.0 on Windows x64. macOS and Linux have not been tested. See [docs/TOOLCHAIN.md](docs/TOOLCHAIN.md) for the existing build resource limits.
+See [toolchain and resource policy](docs/TOOLCHAIN.md) and [comparison with RoboAnalyzer 6](docs/COMPARISON.md). This project has no affiliation with the original RoboAnalyzer team.

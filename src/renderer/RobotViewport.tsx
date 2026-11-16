@@ -3,6 +3,7 @@ import type { Mat4 } from '../robotics/math';
 import type { Joint, Vec3 } from '../robotics/models';
 import { createRobotScene } from './scene';
 import './viewport.css';
+import { ProjectionViewport } from './ProjectionViewport';
 
 export type CameraView = 'perspective' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | 'isometric';
 
@@ -48,14 +49,16 @@ export const RobotViewport = forwardRef<ViewportHandle, ViewportProps>(function 
   const labels = useRef<HTMLDivElement>(null);
   const diagnostics = useRef<HTMLDivElement>(null);
   const scene = useRef<ReturnType<typeof createRobotScene>>(null);
+  const [projectionView, setProjectionView] = useState<CameraView>('isometric');
+  const [projectionFrames, setProjectionFrames] = useState<readonly Mat4[] | undefined>();
   const [error, setError] = useState('');
   const antialias = props.settings.profile !== 'low' && props.settings.antialias;
 
   useImperativeHandle(ref, () => ({
     fit: () => scene.current?.fit(),
-    reset: () => scene.current?.setView('perspective'),
-    setView: (view) => scene.current?.setView(view),
-    setFrames: (frames) => scene.current?.setFrames(frames),
+    reset: () => { scene.current?.setView('perspective'); setProjectionView('isometric'); },
+    setView: (view) => { scene.current?.setView(view); setProjectionView(view); },
+    setFrames: (frames) => { if (scene.current) scene.current.setFrames(frames); else setProjectionFrames(frames); },
   }), []);
 
   useEffect(() => {
@@ -74,12 +77,13 @@ export const RobotViewport = forwardRef<ViewportHandle, ViewportProps>(function 
   }, [antialias]);
 
   useEffect(() => { scene.current?.update(props); }, [props, antialias]);
+  useEffect(() => { setProjectionFrames(undefined); }, [props.frames]);
 
   return (
     <div ref={host} className="robot-viewport">
       <div ref={labels} className="robot-viewport-labels" aria-hidden="true" />
       <div ref={diagnostics} className="robot-viewport-diagnostics" hidden />
-      {error && <p className="robot-viewport-error" role="alert">{error}</p>}
+      {error && <ProjectionViewport frames={projectionFrames ?? props.frames} view={projectionView} selected={props.selectedJoint} onSelect={props.onSelectJoint} trace={props.trace} target={props.target} />}
     </div>
   );
 });
