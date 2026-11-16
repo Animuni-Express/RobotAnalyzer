@@ -11,6 +11,8 @@ const commands = new Map<string, string[]>([
   ['bundle', [...local, 'vite', 'build']],
   ['desktop-dev', [...local, 'tauri', 'dev']],
   ['desktop-build', [...local, 'tauri', 'build']],
+  ['tinyjs-dev', ['tinyjs', 'dev']],
+  ['tinyjs-build', ['tinyjs', 'build']],
 ]);
 const [mode, ...extra] = process.argv.slice(2);
 const command = mode && commands.get(mode);
@@ -20,10 +22,12 @@ if (!command) {
 }
 
 const args = [...command, ...extra];
-if (process.platform === 'win32') applyQuietJob();
-const env = { ...process.env, CARGO_BUILD_JOBS: '1', RAYON_NUM_THREADS: '1', GOMAXPROCS: '1' };
+if (process.platform === 'win32') applyQuietJob(mode === 'desktop-build' ? 4_000_000_000n : 1_000_000_000n);
+const env = { ...process.env, CARGO_BUILD_JOBS: '1', RAYON_NUM_THREADS: '1', GOMAXPROCS: '1',
+  ...(process.platform === 'win32' ? { OS: 'Windows_NT' } : {}),
+};
 const result = spawnSync({
-  cmd: [process.execPath, ...args],
+  cmd: mode!.startsWith('tinyjs-') ? args : [process.execPath, ...args],
   env,
   stdin: 'inherit', stdout: 'inherit', stderr: 'inherit',
 });

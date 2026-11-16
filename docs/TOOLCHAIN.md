@@ -19,9 +19,9 @@ On Windows the script wrapper starts each tool below normal process priority. Ca
 
 ## Verification and measurements
 
-The Windows launcher configures a job-wide hard cap of 10% CPU and 1 GB of committed memory before starting Bun. Nested tool invocations share the same budget. If Windows rejects the limits or refuses to attach the launcher to the job, the command stops before starting the tool. If a compiler exceeds the memory budget, its allocation can fail. [CPU rate limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information) · [Job memory limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information)
+The Windows launcher configures a job-wide hard cap of 10% CPU and 1 GB of committed memory before starting Bun. Tauri desktop builds use 4 GB because the Rust Windows bindings exceed 2 GB during compilation. TinyJS builds and frontend tools retain the 1 GB budget. Nested tool invocations share the same budget. If Windows rejects the limits or refuses to attach the launcher to the job, the command stops before starting the tool. [CPU rate limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information) · [Job memory limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information)
 
-The new development dependencies still need installation and a lockfile refresh. The application and toolchain are under construction. Verification and benchmarks were paused after reports of foreground stuttering.
+On 2026-11-16, `bun run tinyjs:build` passed on Windows x64 with Bun 1.4.4 and TinyJS 0.74.0: both TypeScript checkers, lint (with existing warnings), all 18 tests, the Vite production build and TinyJS executable packaging completed. A separate check against the actual txiki.js runtime passed for file reads, atomic replacement, cancellation, import size limits and window minimum sizing. Native GUI verification was unavailable because computer-use app approval timed out. Performance measurements below remain pending.
 
 | Metric | Result |
 | --- | --- |

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://tinyjs.app/schema/tinyjs.schema.json",
+  "name": "robot-analyzer",
+  "title": "Robot Analyzer (TinyJS)",
+  "id": "org.robotanalyzer.tinyjs",
+  "version": "0.1.0",
+  "minTinyjsVersion": "0.74.0",
+  "size": "1280x720",
+  "backend": "backend/main.js",
+  "windows": { "icon": "src-tauri/icons/icon.ico" },
+  "frontend": {
+    "dev": "bun run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "build": "bun run build",
+    "dist": "dist"
+  },
+  "api": ["openProject", "saveFile"]
+}

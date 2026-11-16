@@ -60,6 +60,10 @@ export function parseProject(text: string): Project {
 }
 
 export async function readProject(pickBrowserFile: () => void): Promise<Project | undefined> {
+  if (window.tiny) {
+    const text = await window.tiny.api.call('openProject');
+    return text === null ? undefined : parseProject(text);
+  }
   if (!isTauri()) { pickBrowserFile(); return; }
   const path = await open({ multiple: false, directory: false, filters: [{ name: 'Robot project', extensions: ['json'] }] });
   if (!path) return;
@@ -74,6 +78,7 @@ export async function readBrowserProject(file: File): Promise<Project> {
 }
 
 export async function writeFile(name: string, extension: 'csv' | 'json', content: string): Promise<boolean> {
+  if (window.tiny) return window.tiny.api.call('saveFile', { name, extension, content });
   if (isTauri()) {
     const path = await save({ defaultPath: name, filters: [{ name: extension.toUpperCase(), extensions: [extension] }] });
     if (!path) return false;

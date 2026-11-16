@@ -11,6 +11,8 @@
     "test": "bun run scripts/toolchain.ts test",
     "check": "bun run typecheck && bun run lint && bun run test",
     "build": "bun run check && bun run scripts/toolchain.ts bundle",
+    "tinyjs:dev": "bun run scripts/toolchain.ts tinyjs-dev",
+    "tinyjs:build": "bun run typecheck:tsc && bun run scripts/toolchain.ts tinyjs-build",
     "desktop:dev": "bun run scripts/toolchain.ts desktop-dev",
     "desktop:build": "bun run typecheck:tsc && bun run scripts/toolchain.ts desktop-build"
   },

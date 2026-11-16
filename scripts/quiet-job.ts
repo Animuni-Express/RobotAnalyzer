@@ -1,6 +1,6 @@
 import { dlopen, ptr } from 'bun:ffi';
 
-export function applyQuietJob() {
+export function applyQuietJob(memoryLimit = 1_000_000_000n) {
   if (process.env.ROBOT_ANALYZER_IN_QUIET_JOB === '1') return;
   if (process.arch !== 'x64' && process.arch !== 'arm64') throw new Error('Quiet builds require 64-bit Windows.');
   const { symbols: win } = dlopen('kernel32.dll', {
@@ -17,7 +17,7 @@ export function applyQuietJob() {
   // Windows x64/ARM64 JOBOBJECT_EXTENDED_LIMIT_INFORMATION layout.
   const limits = Buffer.alloc(144);
   limits.writeUInt32LE(0x2200, 16);
-  limits.writeBigUInt64LE(1_000_000_000n, 120);
+  limits.writeBigUInt64LE(memoryLimit, 120);
   const current = win.GetCurrentProcess();
   if (!win.SetPriorityClass(current, 0x4000) ||
       !win.SetInformationJobObject(job, 15, ptr(cpu), cpu.byteLength) ||
