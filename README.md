@@ -1,6 +1,7 @@
 # Robot Analyzer
 
 A clean-room robotics workstation with a shared React/TypeScript frontend for the hosted website and Rust/Tauri Windows desktop app.
+This is a full clone of the app RoboAnalyzer6, which is closed source and unmaintained. The newer versions are paid, which is why i made the clone.
 
 ```sh
 bun install --frozen-lockfile
